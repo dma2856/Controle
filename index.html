@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Vendas Pro</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #03a9f4, #0288d1);
+            --primary-color: #03a9f4;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-main: #2d3436;
+            --text-sub: #636e72;
+            --border-color: #f1f2f6;
+            --success: #00b894;
+            --pending: #e67e22;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); -webkit-tap-highlight-color: transparent; }
+
+        header {
+            background: var(--primary-gradient);
+            color: white; padding: 18px 20px;
+            display: flex; align-items: center;
+            position: sticky; top: 0; z-index: 100;
+            box-shadow: 0 4px 12px rgba(3, 169, 244, 0.2);
+        }
+
+        .menu-btn { font-size: 20px; cursor: pointer; margin-right: 20px; width: 30px; }
+        .header-title { flex-grow: 1; font-size: 1.1rem; font-weight: 600; }
+        .save-btn { cursor: pointer; font-size: 1.5rem; display: none; color: #fff; }
+
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4); display: none; z-index: 150;
+            backdrop-filter: blur(2px);
+        }
+        .overlay.active { display: block; }
+
+        .sidebar {
+            position: fixed; left: -280px; top: 0; width: 280px; height: 100%;
+            background: white; z-index: 200; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar.active { transform: translateX(280px); }
+        
+        .sidebar-header { background: var(--primary-gradient); padding: 40px 20px; color: white; text-align: center; }
+
+        .menu-item {
+            padding: 16px 24px; display: flex; align-items: center;
+            color: var(--text-main); cursor: pointer; border-radius: 0 25px 25px 0; margin: 4px 15px 4px 0;
+        }
+        .menu-item i { width: 35px; color: var(--primary-color); }
+        .menu-item.active { background: #e1f5fe; color: #0288d1; font-weight: 600; }
+
+        .page { display: none; padding: 12px; padding-bottom: 100px; animation: fadeIn 0.2s; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .sale-card {
+            background: var(--card-bg); padding: 16px; border-radius: 16px;
+            margin-bottom: 12px; display: flex; align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid var(--border-color);
+        }
+        
+        .date-box { 
+            background: #f1f2f6; padding: 8px; border-radius: 12px; 
+            text-align: center; min-width: 55px; margin-right: 15px; font-weight: 700;
+        }
+        .date-box small { text-transform: uppercase; font-size: 0.65rem; color: var(--text-sub); }
+        .sale-info { flex-grow: 1; overflow: hidden; }
+        .sale-info h4 { font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sale-info p { font-size: 0.75rem; color: var(--text-sub); }
+
+        .price-section { text-align: right; min-width: 100px; }
+        .val-total { font-weight: 700; font-size: 0.95rem; display: block; }
+        .val-devedor { font-size: 0.65rem; font-weight: 700; }
+
+        .fab-container { 
+            position: fixed; 
+            bottom: -150px; 
+            right: 20px; 
+            display: flex; 
+            flex-direction: column-reverse; 
+            align-items: center; 
+            z-index: 1000; 
+            transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+        }
+        .fab-container.active { 
+            bottom: 40px; 
+        }
+
+        .fab-main { width: 60px; height: 60px; background: var(--primary-gradient); color: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 8px 20px rgba(3, 169, 244, 0.4); cursor: pointer; transition: transform 0.3s; }
+        .fab-main.active { transform: rotate(45deg); background: #333; }
+        
+        .fab-options { display: flex; flex-direction: column-reverse; margin-bottom: 15px; opacity: 0; pointer-events: none; transform: translateY(20px); transition: 0.3s; }
+        .fab-options.active { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        
+        .fab-mini { width: 48px; height: 48px; background: white; color: var(--primary-color); border-radius: 15px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); cursor: pointer; position: relative; }
+        .fab-mini::after { content: attr(data-label); position: absolute; right: 60px; background: rgba(0,0,0,0.8); color: white; padding: 5px 12px; border-radius: 8px; font-size: 0.75rem; white-space: nowrap; }
+
+        .input-group { background: white; margin-bottom: 12px; border: 1px solid var(--border-color); border-radius: 12px; }
+        .input-group input, .input-group select, .input-group textarea { width: 100%; border: none; padding: 16px; font-size: 1rem; outline: none; background: transparent; color: var(--text-main); }
+        .label-form { font-size: 0.7rem; color: var(--primary-color); font-weight: 700; margin: 10px 0 4px 4px; display: block; text-transform: uppercase; }
+        .resultado-box { background: #e3f2fd; padding: 18px; border-radius: 12px; margin: 15px 0; border-left: 5px solid var(--primary-color); }
+        
+        .action-btns { display: flex; flex-direction: column; gap: 10px; margin-left: 10px; }
+        .delete-btn { color: #ff7675; cursor: pointer; font-size: 0.9rem; padding: 5px; }
+        .edit-btn { color: #03a9f4; cursor: pointer; font-size: 0.9rem; padding: 5px; }
+
+        .client-header-card { background: white; padding: 20px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .client-header-card h2 { color: var(--primary-color); margin-bottom: 5px; }
+        .client-header-card p { font-size: 0.85rem; color: var(--text-sub); margin-bottom: 3px; }
+        
+        .btn-backup { padding: 12px; border-radius: 12px; flex: 1; cursor: pointer; text-align: center; border: 1px solid transparent; transition: 0.2s; }
+        .btn-backup i { font-size: 1.2rem; margin-bottom: 5px; display: block; }
+        .btn-backup span { font-weight: 700; font-size: 0.8rem; display: block; }
+        .btn-backup small { font-size: 0.6rem; opacity: 0.8; }
+    </style>
+</head>
+<body onload="carregarDados()">
+
+<div class="overlay" id="overlay" onclick="closeAllMenus()"></div>
+
+<nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <i class="fas fa-wallet" style="font-size: 35px;"></i>
+        <h3 style="margin-top:10px">Controle Pro</h3>
+    </div>
+    <div style="padding-top: 15px;">
+        <div onclick="showPage('vendas', 'Vendas - Abr/2026')" class="menu-item active" id="m-vendas"><i class="fas fa-receipt"></i> Vendas</div>
+        <div onclick="showPage('resumo', 'Resumo Geral')" class="menu-item" id="m-resumo"><i class="fas fa-chart-pie"></i> Resumo</div>
+        <div onclick="showPage('clientes', 'Meus Clientes')" class="menu-item" id="m-clientes"><i class="fas fa-users"></i> Clientes</div>
+        <div onclick="showPage('categorias', 'Categorias')" class="menu-item" id="m-categorias"><i class="fas fa-tags"></i> Categorias</div>
+        <div onclick="showPage('backup', 'Segurança')" class="menu-item" id="m-backup"><i class="fas fa-database"></i> Backup</div>
+    </div>
+</nav>
+
+<header>
+    <div class="menu-btn" onclick="toggleMenu()" id="header-icon-left"><i class="fas fa-bars-staggered"></i></div>
+    <div class="header-title" id="page-title">Vendas - Abr/2026</div>
+    <div class="save-btn" id="save-btn" onclick="executarSalvamento()"><i class="fas fa-circle-check"></i></div>
+</header>
+
+<div id="vendas" class="page active"><div id="lista-vendas-geral"></div></div>
+
+<div id="resumo" class="page">
+    <div class="resultado-box">
+        <h3 style="color:var(--primary-color)">Balanço Geral</h3>
+        <hr style="margin: 10px 0; border: 0.5px solid #bddbff;">
+        <p style="font-size: 0.9rem;">Total Vendido: <b id="res-total-vendas">R$ 0,00</b></p>
+        <p style="font-size: 0.9rem; margin-top: 5px;">Total a Receber: <b id="res-total-receber" style="color:var(--pending)">R$ 0,00</b></p>
+        <p style="font-size: 0.9rem; margin-top: 5px;">Total Recebido: <b id="res-total-pago" style="color:var(--success)">R$ 0,00</b></p>
+    </div>
+</div>
+
+<div id="clientes" class="page"><div id="lista-clientes"></div></div>
+
+<div id="detalhes-cliente" class="page">
+    <div id="client-info-header"></div>
+    <h4 style="margin: 15px 0 10px 5px; color: var(--text-sub); font-size: 0.8rem; text-transform: uppercase;">Histórico Detalhado</h4>
+    <div id="historico-compras-cliente"></div>
+</div>
+
+<div id="categorias" class="page"><div id="lista-categorias"></div></div>
+
+<div id="backup" class="page">
+    <div class="resultado-box" style="text-align:center;">
+        <i class="fas fa-shield-halved" style="font-size: 2.5rem; color: var(--primary-color); margin-bottom: 15px; display: block;"></i>
+        
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+            <div class="btn-backup" style="background: white; border-color: var(--border-color); flex-basis: 100%;">
+                <i class="fas fa-cloud" style="color: var(--primary-color);"></i>
+                <span>Memória Local</span>
+                <small>Os dados estão seguros neste navegador</small>
+            </div>
+            
+            <div class="btn-backup" onclick="fazerBackupArquivo()" style="background: var(--primary-color); color: white;">
+                <i class="fas fa-file-export"></i>
+                <span>Salvar .db</span>
+                <small>Exportar p/ Celular</small>
+            </div>
+
+            <div class="btn-backup" onclick="document.getElementById('input-restore').click()" style="background: var(--success); color: white;">
+                <i class="fas fa-file-import"></i>
+                <span>Restaurar .db</span>
+                <small>Importar arquivo</small>
+            </div>
+            <input type="file" id="input-restore" style="display:none" accept=".db" onchange="restaurarBackup(this)">
+        </div>
+
+        <p style="font-size:0.75rem; color:var(--text-sub);">Dica: O arquivo terá a data e hora do momento do backup.</p>
+        
+        <button onclick="limparTudo()" style="margin-top:25px; background:#ff7675; border:none; color:white; padding:10px 20px; border-radius:8px; font-size: 0.8rem; width: 100%;">Apagar Todos os Dados do App</button>
+    </div>
+</div>
+
+<div id="nova-venda-final" class="page">
+    <div class="form-container">
+        <input type="hidden" id="editando-venda-id" value="">
+        <span class="label-form">Venda para</span>
+        <div class="input-group"><input type="text" id="venda-resumo-nomes" readonly style="font-weight:bold; color:var(--primary-color)"></div>
+        <span class="label-form">Data da Venda</span>
+        <div class="input-group"><input type="date" id="venda-data-emissao"></div>
+        <span class="label-form">Valor Total (R$)</span>
+        <div class="input-group"><input type="number" id="venda-valor" placeholder="0.00" oninput="calcularDevido()"></div>
+        <span class="label-form">Pagamento</span>
+        <div class="input-group"><select id="venda-pagamento" onchange="toggleCamposPrazo()"><option value="vista">À vista</option><option value="prazo">A Prazo</option></select></div>
+        <div id="campos-prazo" style="display:none;">
+            <span class="label-form">Entrada Paga (R$)</span>
+            <div class="input-group"><input type="number" id="venda-pago" placeholder="0.00" oninput="calcularDevido()"></div>
+            <span class="label-form">Data para Cobrança</span>
+            <div class="input-group"><input type="date" id="venda-data-cobranca"></div>
+        </div>
+        <div class="resultado-box"><p id="venda-resultado-devido" style="font-weight:700">Saldo Devedor: R$ 0,00</p></div>
+    </div>
+</div>
+
+<div id="novo-cliente" class="page">
+    <div class="form-container">
+        <input type="hidden" id="editando-cliente-id" value="">
+        <span class="label-form">Nome</span>
+        <div class="input-group"><input type="text" id="input-nome" placeholder="Nome do Cliente"></div>
+        <span class="label-form">Telefone</span>
+        <div class="input-group"><input type="tel" id="input-telefone" placeholder="(00) 00000-0000"></div>
+        <span class="label-form">Endereço</span>
+        <div class="input-group"><input type="text" id="input-endereco" placeholder="Endereço"></div>
+        <span class="label-form">Anotações</span>
+        <div class="input-group"><textarea id="input-obs" placeholder="Observações importantes..." rows="3" style="resize: none;"></textarea></div>
+    </div>
+</div>
+
+<div id="nova-categoria" class="page">
+    <div class="form-container">
+        <span class="label-form">Nome da Categoria</span>
+        <div class="input-group"><input type="text" id="input-cat-nome" placeholder="Ex: Bebidas"></div>
+    </div>
+</div>
+
+<div class="fab-container" id="fab-container">
+    <div class="fab-options" id="fab-options">
+        <div class="fab-mini" data-label="Categoria" onclick="abrirFormularioCategoria()" style="color: #ff9800;"><i class="fas fa-tags"></i></div>
+        <div class="fab-mini" data-label="Cliente" onclick="abrirFormularioCliente()" style="color: #4caf50;"><i class="fas fa-user-plus"></i></div>
+        <div class="fab-mini" data-label="Venda" onclick="iniciarFluxoVenda()" style="color: #e91e63;"><i class="fas fa-cart-shopping"></i></div>
+    </div>
+    <div class="fab-main" id="fab-main" onclick="toggleFab()"><i class="fas fa-plus"></i></div>
+</div>
+
+<script>
+    let currentMode = ''; 
+    let vendaTemp = { cliente: '', categoria: '' };
+
+    function salvarDados() {
+        localStorage.setItem('vendas_db', document.getElementById('lista-vendas-geral').innerHTML);
+        localStorage.setItem('clientes_db', document.getElementById('lista-clientes').innerHTML);
+        localStorage.setItem('categorias_db', document.getElementById('lista-categorias').innerHTML);
+        atualizarResumo();
+    }
+
+    function carregarDados() {
+        if(localStorage.getItem('vendas_db')) document.getElementById('lista-vendas-geral').innerHTML = localStorage.getItem('vendas_db');
+        if(localStorage.getItem('clientes_db')) document.getElementById('lista-clientes').innerHTML = localStorage.getItem('clientes_db');
+        if(localStorage.getItem('categorias_db')) document.getElementById('lista-categorias').innerHTML = localStorage.getItem('categorias_db');
+        atualizarResumo();
+    }
+
+    function atualizarResumo() {
+        let totalVendido = 0, totalReceber = 0, totalPago = 0;
+        document.querySelectorAll('#lista-vendas-geral .sale-card').forEach(card => {
+            const valorTotal = parseFloat(card.getAttribute('data-valor')) || 0;
+            const valorDevedor = parseFloat(card.getAttribute('data-devedor')) || 0;
+            totalVendido += valorTotal;
+            totalReceber += valorDevedor;
+            totalPago += (valorTotal - valorDevedor);
+        });
+        document.getElementById('res-total-vendas').innerText = `R$ ${totalVendido.toFixed(2)}`;
+        document.getElementById('res-total-receber').innerText = `R$ ${totalReceber.toFixed(2)}`;
+        document.getElementById('res-total-pago').innerText = `R$ ${totalPago.toFixed(2)}`;
+    }
+
+    function toggleMenu() { document.getElementById('sidebar').classList.add('active'); document.getElementById('overlay').classList.add('active'); }
+    
+    function closeAllMenus() { 
+        document.getElementById('sidebar').classList.remove('active'); 
+        document.getElementById('overlay').classList.remove('active'); 
+        document.getElementById('fab-options').classList.remove('active'); 
+        document.getElementById('fab-main').classList.remove('active');
+        document.getElementById('fab-container').classList.remove('active');
+    }
+
+    function toggleFab() { 
+        document.getElementById('fab-container').classList.toggle('active');
+        document.getElementById('fab-options').classList.toggle('active'); 
+        document.getElementById('fab-main').classList.toggle('active'); 
+        document.getElementById('overlay').classList.toggle('active'); 
+    }
+
+    function showPage(pageId, title) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        document.getElementById('page-title').innerText = title;
+        document.getElementById('m-' + (pageId === 'detalhes-cliente' ? 'clientes' : pageId))?.classList.add('active');
+        const icon = document.getElementById('header-icon-left');
+        icon.innerHTML = '<i class="fas fa-bars-staggered"></i>';
+        icon.onclick = toggleMenu;
+        document.getElementById('save-btn').style.display = 'none';
+        closeAllMenus();
+    }
+
+    function configurarHeaderAcao(voltarId, voltarTitulo) {
+        const icon = document.getElementById('header-icon-left');
+        icon.innerHTML = '<i class="fas fa-chevron-left"></i>';
+        icon.onclick = () => showPage(voltarId, voltarTitulo);
+        document.getElementById('save-btn').style.display = 'block';
+    }
+
+    function verDetalhesCliente(nome, id) {
+        if(currentMode === 'venda_cliente') { selecionarClienteParaVenda(nome); return; }
+        const cardCli = document.getElementById(id);
+        const tel = cardCli.getAttribute('data-tel');
+        const end = cardCli.getAttribute('data-end');
+        const obs = cardCli.getAttribute('data-obs');
+        showPage('detalhes-cliente', 'Detalhes do Cliente');
+        configurarHeaderAcao('clientes', 'Meus Clientes');
+        let totalDevidoCli = 0;
+        let historicoHTML = '';
+        document.querySelectorAll('#lista-vendas-geral .sale-card').forEach(venda => {
+            if(venda.querySelector('h4').innerText === nome) {
+                const valor = parseFloat(venda.getAttribute('data-valor')) || 0;
+                const devedor = parseFloat(venda.getAttribute('data-devedor')) || 0;
+                const dataRaw = venda.getAttribute('data-emissao');
+                const data = new Date(dataRaw + "T12:00:00");
+                const categoria = venda.querySelector('.sale-info p').innerText;
+                totalDevidoCli += devedor;
+                historicoHTML += `
+                    <div class="sale-card">
+                        <div class="date-box">${data.getDate()}<br><small>${data.toLocaleString('pt-BR',{month:'short'})}</small></div>
+                        <div class="sale-info">
+                            <h4>${categoria}</h4>
+                            <p>${devedor > 0 ? 'Pendente' : 'Pago em total'}</p>
+                        </div>
+                        <div class="price-section">
+                            <span class="val-total">R$ ${valor.toFixed(2)}</span>
+                            <span class="val-devedor" style="color:${devedor > 0 ? 'var(--pending)' : 'var(--success)'}">
+                                ${devedor > 0 ? 'Falta R$ ' + devedor.toFixed(2) : 'Quitado'}
+                            </span>
+                        </div>
+                    </div>`;
+            }
+        });
+        document.getElementById('client-info-header').innerHTML = `
+            <div class="client-header-card">
+                <h2>${nome}</h2>
+                ${tel ? `<p><i class="fas fa-phone"></i> ${tel}</p>` : ''}
+                ${end ? `<p><i class="fas fa-location-dot"></i> ${end}</p>` : ''}
+                ${obs ? `<p style="margin-top:10px; color:var(--text-main)"><b>Obs:</b> ${obs}</p>` : ''}
+                <div class="resultado-box" style="margin-bottom:0; margin-top:15px">
+                    <p style="font-size:0.8rem">Saldo Devedor Acumulado:</p>
+                    <h3 style="color:${totalDevidoCli > 0 ? 'var(--pending)' : 'var(--success)'}">R$ ${totalDevidoCli.toFixed(2)}</h3>
+                </div>
+            </div>`;
+        document.getElementById('historico-compras-cliente').innerHTML = historicoHTML || '<p style="text-align:center; color:var(--text-sub); margin-top:20px;">Nenhuma venda registrada.</p>';
+    }
+
+    function abrirFormularioCliente() { 
+        document.getElementById('editando-cliente-id').value = '';
+        document.getElementById('input-nome').value = '';
+        document.getElementById('input-telefone').value = '';
+        document.getElementById('input-endereco').value = '';
+        document.getElementById('input-obs').value = '';
+        currentMode = 'cliente'; 
+        showPage('novo-cliente', 'Novo Cliente'); 
+        configurarHeaderAcao('clientes', 'Meus Clientes'); 
+    }
+
+    function editarCliente(id, e) {
+        e.stopPropagation();
+        const card = document.getElementById(id);
+        document.getElementById('editando-cliente-id').value = id;
+        document.getElementById('input-nome').value = card.getAttribute('data-nome');
+        document.getElementById('input-telefone').value = card.getAttribute('data-tel');
+        document.getElementById('input-endereco').value = card.getAttribute('data-end');
+        document.getElementById('input-obs').value = card.getAttribute('data-obs');
+        currentMode = 'cliente';
+        showPage('novo-cliente', 'Editar Cliente');
+        configurarHeaderAcao('clientes', 'Meus Clientes');
+    }
+
+    function iniciarFluxoVenda() {
+        document.getElementById('editando-venda-id').value = "";
+        currentMode = 'venda_cliente';
+        showPage('clientes', '1. Escolha o Cliente');
+        document.getElementById('header-icon-left').innerHTML = '<i class="fas fa-xmark"></i>';
+        document.getElementById('header-icon-left').onclick = () => showPage('vendas', 'Vendas - Abr/2026');
+    }
+
+    function selecionarClienteParaVenda(nome) {
+        vendaTemp.cliente = nome;
+        currentMode = 'venda_categoria';
+        showPage('categorias', '2. Escolha a Categoria');
+    }
+
+    function selecionarCategoriaParaVenda(cat) {
+        if(currentMode !== 'venda_categoria') return;
+        vendaTemp.categoria = cat;
+        currentMode = 'venda_final';
+        showPage('nova-venda-final', '3. Confirmar Venda');
+        document.getElementById('venda-data-emissao').value = new Date().toISOString().split('T')[0];
+        document.getElementById('venda-resumo-nomes').value = `${vendaTemp.cliente} | ${vendaTemp.categoria}`;
+        configurarHeaderAcao('vendas', 'Vendas - Abr/2026');
+    }
+
+    function toggleCamposPrazo() {
+        document.getElementById('campos-prazo').style.display = document.getElementById('venda-pagamento').value === 'prazo' ? 'block' : 'none';
+        calcularDevido();
+    }
+
+    function calcularDevido() {
+        const total = parseFloat(document.getElementById('venda-valor').value) || 0;
+        const pago = parseFloat(document.getElementById('venda-pago').value) || 0;
+        const devedor = document.getElementById('venda-pagamento').value === 'vista' ? 0 : total - pago;
+        document.getElementById('venda-resultado-devido').innerText = `Saldo Devedor: R$ ${devedor.toFixed(2)}`;
+    }
+
+    function editarVenda(id) {
+        const card = document.getElementById(id);
+        const valor = card.getAttribute('data-valor');
+        const devedor = card.getAttribute('data-devedor');
+        const pago = valor - devedor;
+        const cliente = card.querySelector('h4').innerText;
+        const categoria = card.querySelector('.sale-info p').innerText;
+        const cobrancaRaw = card.getAttribute('data-cobranca') || "";
+        const dataEmissaoRaw = card.getAttribute('data-emissao');
+        vendaTemp = { cliente, categoria };
+        document.getElementById('editando-venda-id').value = id;
+        document.getElementById('venda-resumo-nomes').value = `${cliente} | ${categoria}`;
+        document.getElementById('venda-data-emissao').value = dataEmissaoRaw;
+        document.getElementById('venda-valor').value = valor;
+        document.getElementById('venda-pagamento').value = devedor > 0 ? 'prazo' : 'vista';
+        document.getElementById('venda-pago').value = pago;
+        document.getElementById('venda-data-cobranca').value = cobrancaRaw;
+        toggleCamposPrazo();
+        currentMode = 'venda_final';
+        showPage('nova-venda-final', 'Editar Venda');
+        configurarHeaderAcao('vendas', 'Vendas - Abr/2026');
+    }
+
+    function apagarItem(btn, e) { 
+        if(e) e.stopPropagation();
+        if(confirm("Excluir definitivamente?")) { btn.closest('.sale-card').remove(); salvarDados(); } 
+    }
+
+    function abrirFormularioCategoria() { currentMode = 'categoria'; showPage('nova-categoria', 'Nova Categoria'); configurarHeaderAcao('categorias', 'Categorias'); }
+
+    function executarSalvamento() {
+        if(currentMode === 'cliente') {
+            const nome = document.getElementById('input-nome').value;
+            const tel = document.getElementById('input-telefone').value;
+            const end = document.getElementById('input-endereco').value;
+            const obs = document.getElementById('input-obs').value;
+            const editId = document.getElementById('editando-cliente-id').value;
+            if(!nome) return;
+            const idCli = editId || 'cli-' + Date.now();
+            const cardHTML = `<div class="action-btns"><i class="fas fa-pen edit-btn" onclick="editarCliente('${idCli}', event)"></i><i class="fas fa-trash-alt delete-btn" onclick="apagarItem(this, event)"></i></div><div style="flex:1" onclick="verDetalhesCliente('${nome}', '${idCli}')"><h4>${nome}</h4>${tel ? `<p style="color:var(--primary-color); font-weight:600"><i class="fas fa-phone"></i> ${tel}</p>` : ''}<p>${end || ''}</p></div>`;
+            if(editId) {
+                const ce = document.getElementById(editId);
+                ce.innerHTML = cardHTML;
+                ce.setAttribute('data-nome', nome); ce.setAttribute('data-tel', tel); ce.setAttribute('data-end', end); ce.setAttribute('data-obs', obs);
+            } else {
+                const div = document.createElement('div');
+                div.className = 'sale-card'; div.id = idCli;
+                div.setAttribute('data-nome', nome); div.setAttribute('data-tel', tel); div.setAttribute('data-end', end); div.setAttribute('data-obs', obs);
+                div.innerHTML = cardHTML;
+                document.getElementById('lista-clientes').prepend(div);
+            }
+            showPage('clientes', 'Meus Clientes');
+        } 
+        else if(currentMode === 'categoria') {
+            const cat = document.getElementById('input-cat-nome').value;
+            if(!cat) return;
+            const div = document.createElement('div');
+            div.className = 'sale-card';
+            div.innerHTML = `<i class="fas fa-trash-alt delete-btn" onclick="apagarItem(this, event)"></i><span style="flex:1" onclick="selecionarCategoriaParaVenda('${cat}')">${cat}</span>`;
+            document.getElementById('lista-categorias').prepend(div);
+            showPage('categorias', 'Categorias');
+        }
+        else if(currentMode === 'venda_final') {
+            const valor = parseFloat(document.getElementById('venda-valor').value) || 0;
+            const pagoInput = parseFloat(document.getElementById('venda-pago').value) || 0;
+            const tipoPagamento = document.getElementById('venda-pagamento').value;
+            const pagoReal = (tipoPagamento === 'vista') ? valor : pagoInput;
+            const devedor = valor - pagoReal;
+            const cobranca = document.getElementById('venda-data-cobranca').value;
+            const dataEmissaoRaw = document.getElementById('venda-data-emissao').value;
+            const editId = document.getElementById('editando-venda-id').value;
+            const idVenda = editId || 'venda-' + Date.now();
+            const data = new Date(dataEmissaoRaw + "T12:00:00");
+            const cardHTML = `<div class="action-btns"><i class="fas fa-pen edit-btn" onclick="editarVenda('${idVenda}')"></i><i class="fas fa-trash-alt delete-btn" onclick="apagarItem(this, event)"></i></div><div class="date-box">${data.getDate()}<br><small>${data.toLocaleString('pt-BR',{month:'short'})}</small></div><div class="sale-info"><h4>${vendaTemp.cliente}</h4><p>${vendaTemp.categoria}</p>${(tipoPagamento === 'prazo' && cobranca) ? `<p style="color:var(--pending); font-size:0.65rem">Cobrar em: ${cobranca.split('-').reverse().join('/')}</p>` : ''}</div><div class="price-section"><span class="val-total">R$ ${valor.toFixed(2)}</span><span class="val-devedor" style="color:${devedor > 0 ? 'var(--pending)' : 'var(--success)'}">${devedor > 0 ? 'Falta R$ ' + devedor.toFixed(2) : 'Pago'}</span></div>`;
+            if(editId) {
+                const ce = document.getElementById(editId);
+                ce.innerHTML = cardHTML;
+                ce.setAttribute('data-valor', valor); ce.setAttribute('data-devedor', devedor); ce.setAttribute('data-cobranca', cobranca); ce.setAttribute('data-emissao', dataEmissaoRaw);
+            } else {
+                const card = document.createElement('div');
+                card.className = 'sale-card'; card.id = idVenda;
+                card.setAttribute('data-valor', valor); card.setAttribute('data-devedor', devedor);
+                card.setAttribute('data-cobranca', cobranca); card.setAttribute('data-emissao', dataEmissaoRaw);
+                card.innerHTML = cardHTML;
+                document.getElementById('lista-vendas-geral').prepend(card);
+            }
+            showPage('vendas', 'Vendas - Abr/2026');
+        }
+        salvarDados();
+    }
+
+    function fazerBackupArquivo() {
+        const dadosParaBackup = {
+            vendas: localStorage.getItem('vendas_db') || '',
+            clientes: localStorage.getItem('clientes_db') || '',
+            categorias: localStorage.getItem('categorias_db') || '',
+            dataExportacao: new Date().toISOString()
+        };
+        const dataStr = JSON.stringify(dadosParaBackup);
+        const blob = new Blob([dataStr], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        
+        // Gerando nome dinâmico: vendasDD/MM/AAAA_HH:MMhr.db
+        const agora = new Date();
+        const dia = String(agora.getDate()).padStart(2, '0');
+        const mes = String(agora.getMonth() + 1).padStart(2, '0');
+        const ano = agora.getFullYear();
+        const hora = String(agora.getHours()).padStart(2, '0');
+        const min = String(agora.getMinutes()).padStart(2, '0');
+        
+        const nomeArquivo = `vendas${dia}_${mes}_${ano}_${hora}_${min}hr.db`;
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = nomeArquivo;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        alert(`Backup "${nomeArquivo}" gerado com sucesso!`);
+    }
+
+    function restaurarBackup(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const dados = JSON.parse(e.target.result);
+                if (dados.vendas !== undefined && dados.clientes !== undefined) {
+                    if (confirm("Isso substituirá todos os dados atuais. Deseja continuar?")) {
+                        localStorage.setItem('vendas_db', dados.vendas);
+                        localStorage.setItem('clientes_db', dados.clientes);
+                        localStorage.setItem('categorias_db', dados.categorias || '');
+                        alert("Dados restaurados com sucesso!");
+                        location.reload();
+                    }
+                } else { alert("Arquivo .db inválido!"); }
+            } catch (err) { alert("Erro ao ler o arquivo."); }
+        };
+        reader.readAsText(file);
+        input.value = '';
+    }
+
+    function limparTudo() { if(confirm("Apagar tudo? Isso é irreversível!")) { localStorage.clear(); location.reload(); } }
+</script>
+</body>
+</html>
